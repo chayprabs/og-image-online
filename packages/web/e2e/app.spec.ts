@@ -3,14 +3,14 @@ import { expect, test } from "@playwright/test";
 test("home loads with tabs and export", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("link", { name: "SocialRender" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Code Image" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "OG Image" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Code Image" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "OG Image" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Export" })).toBeVisible();
 });
 
 test("OG mode shows variable fields", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "OG Image" }).click();
+  await page.getByRole("tab", { name: "OG Image" }).click();
   await expect(page.getByRole("textbox", { name: "Title", exact: true })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Subtitle" })).toBeVisible();
 });

@@ -16,7 +16,7 @@ function XIcon() {
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col bg-[#fafafa]">
+    <div className="flex min-h-screen flex-col bg-white">
       <header className="sticky top-0 z-50 border-b border-[#e5e7eb] bg-white/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
           <Link to="/" className="text-lg font-semibold tracking-tight text-gray-900">
@@ -27,7 +27,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               href={GITHUB_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-gray-600 transition hover:text-gray-900"
+              className="rounded-md p-2 text-gray-600 transition hover:bg-gray-100 hover:text-gray-900"
               title="GitHub repository"
             >
               <Github size={20} />

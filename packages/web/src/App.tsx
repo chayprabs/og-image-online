@@ -19,6 +19,7 @@ export default function App() {
           element={<SeoLandingPage slug="linkedin-preview-image" />}
         />
         <Route path="/code-to-image" element={<SeoLandingPage slug="code-to-image" />} />
+        <Route path="*" element={<HomePage />} />
       </Routes>
     </Layout>
   );

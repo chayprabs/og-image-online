@@ -7,6 +7,7 @@ import {
   decodeShareState,
   detectLanguage,
   encodeShareState,
+  loadTheme,
   type AppMode,
   type ExportDpi,
   type ExportFormat,
@@ -14,10 +15,14 @@ import {
 } from "@social-render/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-export function usePlayground() {
-  const [mode, setMode] = useState<AppMode>("code");
+function defaultPresetForMode(mode: AppMode): string {
+  return mode === "code" ? "auto" : "og";
+}
+
+export function usePlayground(initial?: { mode?: AppMode; sizePresetId?: string }) {
+  const [mode, setModeState] = useState<AppMode>(initial?.mode ?? "code");
   const [code, setCode] = useState(CODE_SAMPLES[0].code);
-  const [language, setLanguage] = useState("typescript");
+  const [language, setLanguage] = useState("auto");
   const [languageManual, setLanguageManual] = useState(false);
   const [theme, setTheme] = useState<string>(BUILTIN_THEMES[0]);
   const [customThemeJson, setCustomThemeJson] = useState("");
@@ -34,30 +39,51 @@ export function usePlayground() {
   const [ogSubtitle, setOgSubtitle] = useState(BRAND_TEMPLATES[0].defaultSubtitle);
   const [ogAccent, setOgAccent] = useState(BRAND_TEMPLATES[0].accentColor);
   const [brandTemplateId, setBrandTemplateId] = useState(BRAND_TEMPLATES[0].id);
-  const [sizePresetId, setSizePresetId] = useState("og");
+  const [codeSizePresetId, setCodeSizePresetId] = useState(
+    initial?.mode === "og" ? "og" : (initial?.sizePresetId ?? "auto"),
+  );
+  const [ogSizePresetId, setOgSizePresetId] = useState(
+    initial?.sizePresetId ?? "og",
+  );
   const [exportFormat, setExportFormat] = useState<ExportFormat>("png");
   const [exportDpi, setExportDpi] = useState<ExportDpi>(2);
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewSvg, setPreviewSvg] = useState("");
+  const [previewError, setPreviewError] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
 
+  const setMode = (next: AppMode) => {
+    setModeState(next);
+  };
+
+  const sizePresetId = mode === "code" ? codeSizePresetId : ogSizePresetId;
+  const setSizePresetId = (id: string) => {
+    if (mode === "code") setCodeSizePresetId(id);
+    else setOgSizePresetId(id);
+  };
+
   const sizePreset = useMemo(() => {
     const list = mode === "code" ? CODE_SIZE_PRESETS : SIZE_PRESETS;
-    return list.find((p) => p.id === sizePresetId) ?? list[0];
-  }, [mode, sizePresetId]);
+    const id = mode === "code" ? codeSizePresetId : ogSizePresetId;
+    return list.find((p) => p.id === id) ?? list[0];
+  }, [mode, codeSizePresetId, ogSizePresetId]);
 
-  const effectiveTheme = useMemo(() => {
-    if (customThemeJson.trim()) {
-      try {
-        const parsed = JSON.parse(customThemeJson) as { name?: string };
-        return parsed.name ?? theme;
-      } catch {
-        return theme;
-      }
+  const effectiveTheme = useMemo(() => theme, [theme]);
+
+  useEffect(() => {
+    if (!customThemeJson.trim()) return;
+    try {
+      const parsed = JSON.parse(customThemeJson) as { name?: string };
+      if (parsed.name) void loadTheme(parsed.name);
+    } catch {
+      /* ignore invalid JSON */
     }
-    return theme;
-  }, [customThemeJson, theme]);
+  }, [customThemeJson]);
+
+  useEffect(() => {
+    void loadTheme(effectiveTheme);
+  }, [effectiveTheme]);
 
   const parsedLineHighlights = useMemo(
     () =>
@@ -69,36 +95,50 @@ export function usePlayground() {
   );
 
   const detectedLang = useMemo(() => {
-    if (languageManual) return language;
-    return detectLanguage(code, language);
+    if (languageManual && language !== "auto") return language;
+    return detectLanguage(code);
   }, [code, language, languageManual]);
 
-  useEffect(() => {
+  const hydrateFromHash = useCallback(() => {
     const fromHash = decodeShareState(window.location.hash);
     if (!fromHash) return;
-    setMode(fromHash.mode);
+    setModeState(fromHash.mode);
     const p = fromHash.payload;
     if (typeof p.code === "string") setCode(p.code);
     if (typeof p.language === "string") {
       setLanguage(p.language);
-      setLanguageManual(true);
+      setLanguageManual(p.language !== "auto");
     }
+    if (typeof p.theme === "string") setTheme(p.theme);
     if (typeof p.ogTitle === "string") setOgTitle(p.ogTitle);
     if (typeof p.ogSubtitle === "string") setOgSubtitle(p.ogSubtitle);
+    if (typeof p.brandTemplateId === "string") setBrandTemplateId(p.brandTemplateId);
+    if (typeof p.ogAccent === "string") setOgAccent(p.ogAccent);
   }, []);
 
-  const shareUrl = useCallback(() => {
+  useEffect(() => {
+    hydrateFromHash();
+    window.addEventListener("hashchange", hydrateFromHash);
+    return () => window.removeEventListener("hashchange", hydrateFromHash);
+  }, [hydrateFromHash]);
+
+  const shareUrl = useCallback(async () => {
     const hash = encodeShareState({
       mode,
       payload:
         mode === "code"
           ? { code, language: detectedLang, theme: effectiveTheme }
-          : { ogTitle, ogSubtitle, brandTemplateId },
+          : { ogTitle, ogSubtitle, brandTemplateId, ogAccent },
     });
     const url = `${window.location.origin}${window.location.pathname}${hash}`;
-    void navigator.clipboard.writeText(url);
-    setStatus("Share link copied to clipboard");
-  }, [mode, code, detectedLang, effectiveTheme, ogTitle, ogSubtitle, brandTemplateId]);
+    window.location.hash = hash.slice(1);
+    try {
+      await navigator.clipboard.writeText(url);
+      setStatus("Share link copied to clipboard");
+    } catch {
+      setStatus("Share URL updated — copy from the address bar");
+    }
+  }, [mode, code, detectedLang, effectiveTheme, ogTitle, ogSubtitle, brandTemplateId, ogAccent]);
 
   const applyBrandTemplate = (id: string) => {
     const t = BRAND_TEMPLATES.find((b) => b.id === id);
@@ -161,11 +201,14 @@ export function usePlayground() {
     setPreviewHtml,
     previewSvg,
     setPreviewSvg,
+    previewError,
+    setPreviewError,
     busy,
     setBusy,
     status,
     setStatus,
     detectedLang,
     shareUrl,
+    defaultPresetForMode,
   };
 }

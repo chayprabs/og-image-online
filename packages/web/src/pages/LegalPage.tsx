@@ -1,7 +1,10 @@
+import DocumentTitle from "../components/DocumentTitle";
+
 export default function LegalPage({ kind }: { kind: "privacy" | "terms" }) {
   if (kind === "privacy") {
     return (
       <article className="prose prose-sm mx-auto max-w-3xl text-gray-700">
+        <DocumentTitle title="Privacy Policy | SocialRender" />
         <h1 className="text-2xl font-semibold text-gray-900">Privacy Policy</h1>
         <p className="text-sm text-gray-500">Last updated: May 31, 2026</p>
         <p>
@@ -30,6 +33,8 @@ export default function LegalPage({ kind }: { kind: "privacy" | "terms" }) {
           Questions: open an issue at{" "}
           <a
             href="https://github.com/chayprabs/og-image-online"
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-blue-600 hover:underline"
           >
             github.com/chayprabs/og-image-online
@@ -42,6 +47,7 @@ export default function LegalPage({ kind }: { kind: "privacy" | "terms" }) {
 
   return (
     <article className="prose prose-sm mx-auto max-w-3xl text-gray-700">
+      <DocumentTitle title="Terms & Conditions | SocialRender" />
       <h1 className="text-2xl font-semibold text-gray-900">Terms & Conditions</h1>
       <p className="text-sm text-gray-500">Last updated: May 31, 2026</p>
       <p>

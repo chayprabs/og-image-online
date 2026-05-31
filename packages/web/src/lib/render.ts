@@ -1,6 +1,5 @@
 import {
-  canvasFromSvg,
-  canvasToBlob,
+  BRAND_TEMPLATES,
   downloadBlob,
   exportRaster,
   renderCodeToHtml,
@@ -11,72 +10,101 @@ import {
   type ExportFormat,
   type OgRenderOptions,
 } from "@social-render/core";
+import { toBlob } from "html-to-image";
+import { loadOgFonts } from "./fonts";
 
 export async function updateCodePreview(opts: CodeRenderOptions): Promise<string> {
   return renderCodeToHtml(opts);
 }
 
 export async function updateOgPreview(opts: OgRenderOptions): Promise<string> {
-  return renderOG(opts);
+  const fonts = await loadOgFonts();
+  const label = BRAND_TEMPLATES.find((t) => t.id === opts.templateId)?.label;
+  return renderOG(opts, fonts, label);
 }
 
-export async function exportPreview(
-  svgOrHtml: string,
+export async function exportOgPreview(
+  svg: string,
   width: number,
   height: number,
   format: ExportFormat,
   dpi: ExportDpi,
-  isOg: boolean,
-): Promise<void> {
-  let svg = svgOrHtml;
-  if (!isOg && !svgOrHtml.trimStart().startsWith("<svg")) {
-    const wrapper = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-      <foreignObject width="100%" height="100%">
-        <div xmlns="http://www.w3.org/1999/xhtml">${svgOrHtml}</div>
-      </foreignObject>
-    </svg>`;
-    svg = wrapper;
-  }
-
+): Promise<{ blob: Blob; ext: string }> {
   if (format === "svg") {
-    const blob = await svgToBlob(svg);
-    downloadBlob(blob, `social-render.${format}`);
-    return;
+    return { blob: await svgToBlob(svg), ext: "svg" };
   }
-
   const blob = await exportRaster(svg, width, height, format, dpi);
-  downloadBlob(blob, `social-render@${dpi}x.${format}`);
+  const ext = format === "jpeg" ? "jpg" : format;
+  return { blob, ext };
 }
 
-export async function htmlToPngBlob(html: string, width: number, height: number): Promise<Blob> {
+export async function exportCodeFromHtml(
+  html: string,
+  format: ExportFormat,
+  dpi: ExportDpi,
+): Promise<{ blob: Blob; ext: string }> {
+  const host = document.createElement("div");
+  host.style.cssText = "position:fixed;left:-9999px;top:0;z-index:-1";
   const iframe = document.createElement("iframe");
-  iframe.style.cssText = "position:fixed;left:-9999px;width:0;height:0;border:0";
-  document.body.appendChild(iframe);
+  iframe.style.border = "0";
+  iframe.width = "1200";
+  iframe.height = "800";
+  host.appendChild(iframe);
+  document.body.appendChild(host);
+
   const doc = iframe.contentDocument!;
   doc.open();
   doc.write(html);
   doc.close();
+  await new Promise((r) => setTimeout(r, 200));
 
-  await new Promise((r) => setTimeout(r, 150));
+  const target = doc.getElementById("export-root") ?? doc.body;
+  const pixelRatio = dpi;
 
-  const body = doc.body;
-  const w = Math.max(body.scrollWidth, width);
-  const h = Math.max(body.scrollHeight, height);
+  let blob: Blob | null;
+  if (format === "svg") {
+    const w = target.scrollWidth;
+    const h = target.scrollHeight;
+    const serialized = new XMLSerializer().serializeToString(target);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml">${serialized}</div></foreignObject></svg>`;
+    document.body.removeChild(host);
+    return { blob: await svgToBlob(svg), ext: "svg" };
+  }
 
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = "#0f172a";
-  ctx.fillRect(0, 0, w, h);
+  const mime =
+    format === "png"
+      ? "image/png"
+      : format === "jpeg"
+        ? "image/jpeg"
+        : format === "webp"
+          ? "image/webp"
+          : "image/png";
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-    <foreignObject width="100%" height="100%">
-      <div xmlns="http://www.w3.org/1999/xhtml">${body.innerHTML}</div>
-    </foreignObject>
-  </svg>`;
+  blob = await toBlob(target, {
+    pixelRatio,
+    cacheBust: true,
+    skipFonts: false,
+    type: mime,
+    quality: 0.92,
+  });
 
-  document.body.removeChild(iframe);
-  const rasterCanvas = await canvasFromSvg(svg, w, h);
-  return canvasToBlob(rasterCanvas, "png");
+  document.body.removeChild(host);
+  if (!blob) throw new Error("Export failed");
+
+  let ext = format === "jpeg" ? "jpg" : format;
+  if (format === "avif") {
+    ext = blob.type.includes("avif") ? "avif" : "webp";
+  }
+
+  return { blob, ext };
+}
+
+export async function downloadExport(
+  blob: Blob,
+  format: ExportFormat,
+  dpi: ExportDpi,
+  ext: string,
+): Promise<void> {
+  const suffix = format === "svg" ? "" : `@${dpi}x`;
+  downloadBlob(blob, `social-render${suffix}.${ext}`);
 }

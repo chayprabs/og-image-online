@@ -8,7 +8,13 @@ import {
 import { Download, Link2, Loader2, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import { usePlayground } from "../hooks/usePlayground";
-import { exportPreview, htmlToPngBlob, updateCodePreview, updateOgPreview } from "../lib/render";
+import {
+  downloadExport,
+  exportCodeFromHtml,
+  exportOgPreview,
+  updateCodePreview,
+  updateOgPreview,
+} from "../lib/render";
 
 const LANGUAGES = [
   "auto",
@@ -28,8 +34,14 @@ const LANGUAGES = [
   "diff",
 ];
 
-export default function Playground() {
-  const pg = usePlayground();
+export default function Playground({
+  initialMode,
+  initialSizePresetId,
+}: {
+  initialMode?: "code" | "og";
+  initialSizePresetId?: string;
+} = {}) {
+  const pg = usePlayground({ mode: initialMode, sizePresetId: initialSizePresetId });
   const previewRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -55,6 +67,7 @@ export default function Playground() {
         });
         pg.setPreviewHtml(html);
         pg.setPreviewSvg("");
+        pg.setPreviewError("");
       } else {
         const svg = await updateOgPreview({
           title: pg.ogTitle,
@@ -66,9 +79,12 @@ export default function Playground() {
         });
         pg.setPreviewSvg(svg);
         pg.setPreviewHtml("");
+        pg.setPreviewError("");
       }
     } catch (e) {
-      pg.setStatus(e instanceof Error ? e.message : "Preview failed");
+      const msg = e instanceof Error ? e.message : "Preview failed";
+      pg.setPreviewError(msg);
+      if (!pg.busy) pg.setPreviewError(msg);
     }
   }, [pg]);
 
@@ -83,22 +99,21 @@ export default function Playground() {
     pg.setStatus("");
     try {
       if (pg.mode === "code") {
-        const blob = await htmlToPngBlob(
+        const { blob, ext } = await exportCodeFromHtml(
           pg.previewHtml,
-          pg.sizePreset.width * pg.exportDpi,
-          pg.sizePreset.height * pg.exportDpi,
+          pg.exportFormat,
+          pg.exportDpi,
         );
-        const { downloadBlob } = await import("@social-render/core");
-        downloadBlob(blob, `code-screenshot@${pg.exportDpi}x.${pg.exportFormat === "jpeg" ? "jpg" : pg.exportFormat}`);
+        await downloadExport(blob, pg.exportFormat, pg.exportDpi, ext);
       } else {
-        await exportPreview(
+        const { blob, ext } = await exportOgPreview(
           pg.previewSvg,
           pg.sizePreset.width,
           pg.sizePreset.height,
           pg.exportFormat,
           pg.exportDpi,
-          true,
         );
+        await downloadExport(blob, pg.exportFormat, pg.exportDpi, ext);
       }
       pg.setStatus("Exported successfully");
     } catch (e) {
@@ -115,6 +130,8 @@ export default function Playground() {
       <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-3">
         <button
           type="button"
+          role="tab"
+          aria-selected={pg.mode === "code"}
           onClick={() => pg.setMode("code")}
           className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
             pg.mode === "code"
@@ -126,6 +143,8 @@ export default function Playground() {
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={pg.mode === "og"}
           onClick={() => pg.setMode("og")}
           className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
             pg.mode === "og"
@@ -138,7 +157,7 @@ export default function Playground() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-4">
+        <div className="order-2 space-y-4 lg:order-1">
           {pg.mode === "code" ? (
             <>
               <label className="block text-sm font-medium text-gray-700">
@@ -160,6 +179,7 @@ export default function Playground() {
                     onChange={(e) => {
                       const v = e.target.value;
                       if (v === "auto") {
+                        pg.setLanguage("auto");
                         pg.setLanguageManual(false);
                       } else {
                         pg.setLanguage(v);
@@ -419,17 +439,21 @@ export default function Playground() {
             </button>
           </div>
 
-          {pg.status && (
-            <p className="flex items-center gap-2 text-sm text-gray-600">
+          {(pg.status || pg.previewError) && (
+            <p
+              className="flex items-center gap-2 text-sm text-gray-600"
+              aria-live="polite"
+              role="status"
+            >
               <Sparkles size={14} className="text-blue-500" />
-              {pg.status}
+              {pg.busy ? pg.status : pg.status || pg.previewError}
             </p>
           )}
         </div>
 
         <div
           ref={previewRef}
-          className="flex min-h-[320px] items-start justify-center overflow-auto rounded-xl border border-gray-200 bg-[#f4f4f5] p-4"
+          className="order-first flex min-h-[280px] items-start justify-center overflow-auto rounded-xl border border-gray-200 bg-white p-4 lg:order-none lg:min-h-[320px]"
         >
           {pg.mode === "code" && pg.previewHtml ? (
             <iframe
@@ -442,8 +466,12 @@ export default function Playground() {
           ) : pg.mode === "og" && pg.previewSvg ? (
             <div
               className="max-w-full overflow-auto"
+              role="img"
+              aria-label="OG image preview"
               dangerouslySetInnerHTML={{ __html: pg.previewSvg }}
             />
+          ) : pg.previewError ? (
+            <p className="text-sm text-red-600">{pg.previewError}</p>
           ) : (
             <p className="text-sm text-gray-500">Generating preview…</p>
           )}
