@@ -1,68 +1,82 @@
 import {
-  BUILTIN_THEMES,
   BRAND_TEMPLATES,
-  CODE_SAMPLES,
   CODE_SIZE_PRESETS,
-  DEFAULT_OG_TEMPLATE_JSON,
   SIZE_PRESETS,
   decodeShareState,
-  detectLanguage,
   encodeShareState,
   loadCustomTheme,
   loadTheme,
   parseDiffHighlights,
   parseOgTemplateJson,
+  detectLanguage,
   type AppMode,
   type ExportDpi,
   type ExportFormat,
   type WindowChrome,
 } from "@social-render/core";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { clearPersisted, loadPersisted, savePersisted } from "../lib/storage";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
+import {
+  PLAYGROUND_DEFAULTS,
+  buildCodeSharePayload,
+  buildOgSharePayload,
+  mergeFromPayload,
+  resolveInitialPlaygroundState,
+  snapshotToPersisted,
+  type PlaygroundRouteInitial,
+  type PlaygroundSnapshot,
+} from "../lib/playground-state";
+import { clearPersisted, savePersisted } from "../lib/storage";
 
-export function usePlayground(initial?: { mode?: AppMode; sizePresetId?: string }) {
-  const saved = typeof window !== "undefined" ? loadPersisted() : null;
+export function usePlayground(initial?: PlaygroundRouteInitial) {
+  const [init] = useState(() => resolveInitialPlaygroundState(initial));
+  const persistReady = useRef(false);
+  const blockPersistRef = useRef(false);
 
-  const [mode, setModeState] = useState<AppMode>(initial?.mode ?? saved?.mode ?? "code");
-  const [code, setCode] = useState(saved?.code ?? CODE_SAMPLES[0].code);
-  const [language, setLanguage] = useState(saved?.language ?? "auto");
-  const [languageManual, setLanguageManual] = useState(
-    Boolean(saved?.language && saved.language !== "auto"),
+  const withPersist = useCallback(
+    <T,>(setter: Dispatch<SetStateAction<T>>) =>
+      (value: SetStateAction<T>) => {
+        blockPersistRef.current = false;
+        setter(value);
+      },
+    [],
   );
-  const [theme, setTheme] = useState(saved?.theme ?? BUILTIN_THEMES[0]);
-  const [customThemeJson, setCustomThemeJson] = useState("");
+
+  const [mode, setModeState] = useState<AppMode>(init.mode);
+  const [code, setCode] = useState(init.code);
+  const [language, setLanguage] = useState(init.language);
+  const [languageManual, setLanguageManual] = useState(init.languageManual);
+  const [theme, setTheme] = useState(init.theme);
+  const [customThemeJson, setCustomThemeJson] = useState(init.customThemeJson);
   const [customThemeName, setCustomThemeName] = useState<string | null>(null);
-  const [windowChrome, setWindowChrome] = useState<WindowChrome>("macos");
-  const [showLineNumbers, setShowLineNumbers] = useState(true);
-  const [lineHighlights, setLineHighlights] = useState("");
-  const [enableDiffHighlights, setEnableDiffHighlights] = useState(false);
-  const [padding, setPadding] = useState(24);
-  const [shadow, setShadow] = useState(true);
-  const [gradient, setGradient] = useState(true);
-  const [fontFamily, setFontFamily] = useState("JetBrains Mono, monospace");
-  const [customFontCss, setCustomFontCss] = useState("");
-  const [fontSize, setFontSize] = useState(14);
-  const [ligatures, setLigatures] = useState(true);
-  const [ogTitle, setOgTitle] = useState(saved?.ogTitle ?? BRAND_TEMPLATES[0].defaultTitle);
-  const [ogSubtitle, setOgSubtitle] = useState(
-    saved?.ogSubtitle ?? BRAND_TEMPLATES[0].defaultSubtitle,
-  );
-  const [ogAccent, setOgAccent] = useState(saved?.ogAccent ?? BRAND_TEMPLATES[0].accentColor);
-  const [brandTemplateId, setBrandTemplateId] = useState(
-    saved?.brandTemplateId ?? BRAND_TEMPLATES[0].id,
-  );
-  const [ogTemplateJson, setOgTemplateJson] = useState(
-    saved?.ogTemplateJson ?? DEFAULT_OG_TEMPLATE_JSON,
-  );
-  const [ogLogoDataUrl, setOgLogoDataUrl] = useState<string | undefined>();
-  const [codeSizePresetId, setCodeSizePresetId] = useState(
-    initial?.mode === "og" ? "og" : (initial?.sizePresetId ?? "auto"),
-  );
-  const [ogSizePresetId, setOgSizePresetId] = useState(initial?.sizePresetId ?? "og");
-  const [exportFormat, setExportFormat] = useState<ExportFormat>(
-    (saved?.exportFormat as ExportFormat) ?? "png",
-  );
-  const [exportDpi, setExportDpi] = useState<ExportDpi>((saved?.exportDpi as ExportDpi) ?? 2);
+  const [windowChrome, setWindowChrome] = useState<WindowChrome>(init.windowChrome);
+  const [showLineNumbers, setShowLineNumbers] = useState(init.showLineNumbers);
+  const [lineHighlights, setLineHighlights] = useState(init.lineHighlights);
+  const [enableDiffHighlights, setEnableDiffHighlights] = useState(init.enableDiffHighlights);
+  const [padding, setPadding] = useState(init.padding);
+  const [shadow, setShadow] = useState(init.shadow);
+  const [gradient, setGradient] = useState(init.gradient);
+  const [fontFamily, setFontFamily] = useState(init.fontFamily);
+  const [customFontCss, setCustomFontCss] = useState(init.customFontCss);
+  const [fontSize, setFontSize] = useState(init.fontSize);
+  const [ligatures, setLigatures] = useState(init.ligatures);
+  const [ogTitle, setOgTitle] = useState(init.ogTitle);
+  const [ogSubtitle, setOgSubtitle] = useState(init.ogSubtitle);
+  const [ogAccent, setOgAccent] = useState(init.ogAccent);
+  const [brandTemplateId, setBrandTemplateId] = useState(init.brandTemplateId);
+  const [ogTemplateJson, setOgTemplateJson] = useState(init.ogTemplateJson);
+  const [ogLogoDataUrl, setOgLogoDataUrl] = useState<string | undefined>(init.ogLogoDataUrl);
+  const [codeSizePresetId, setCodeSizePresetId] = useState(init.codeSizePresetId);
+  const [ogSizePresetId, setOgSizePresetId] = useState(init.ogSizePresetId);
+  const [exportFormat, setExportFormat] = useState<ExportFormat>(init.exportFormat);
+  const [exportDpi, setExportDpi] = useState<ExportDpi>(init.exportDpi);
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewSvg, setPreviewSvg] = useState("");
   const [previewError, setPreviewError] = useState("");
@@ -70,13 +84,76 @@ export function usePlayground(initial?: { mode?: AppMode; sizePresetId?: string 
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
 
-  const setMode = (next: AppMode) => setModeState(next);
+  const snapshot = useMemo(
+    (): PlaygroundSnapshot => ({
+      mode,
+      code,
+      language,
+      languageManual,
+      theme,
+      customThemeJson,
+      windowChrome,
+      showLineNumbers,
+      lineHighlights,
+      enableDiffHighlights,
+      padding,
+      shadow,
+      gradient,
+      fontFamily,
+      customFontCss,
+      fontSize,
+      ligatures,
+      ogTitle,
+      ogSubtitle,
+      ogAccent,
+      brandTemplateId,
+      ogTemplateJson,
+      ogLogoDataUrl,
+      codeSizePresetId,
+      ogSizePresetId,
+      exportFormat,
+      exportDpi,
+    }),
+    [
+      mode,
+      code,
+      language,
+      languageManual,
+      theme,
+      customThemeJson,
+      windowChrome,
+      showLineNumbers,
+      lineHighlights,
+      enableDiffHighlights,
+      padding,
+      shadow,
+      gradient,
+      fontFamily,
+      customFontCss,
+      fontSize,
+      ligatures,
+      ogTitle,
+      ogSubtitle,
+      ogAccent,
+      brandTemplateId,
+      ogTemplateJson,
+      ogLogoDataUrl,
+      codeSizePresetId,
+      ogSizePresetId,
+      exportFormat,
+      exportDpi,
+    ],
+  );
 
   const sizePresetId = mode === "code" ? codeSizePresetId : ogSizePresetId;
-  const setSizePresetId = (id: string) => {
-    if (mode === "code") setCodeSizePresetId(id);
-    else setOgSizePresetId(id);
-  };
+  const setSizePresetId = useCallback(
+    (id: string) => {
+      blockPersistRef.current = false;
+      if (mode === "code") setCodeSizePresetId(id);
+      else setOgSizePresetId(id);
+    },
+    [mode],
+  );
 
   const sizePreset = useMemo(() => {
     const list = mode === "code" ? CODE_SIZE_PRESETS : SIZE_PRESETS;
@@ -103,6 +180,10 @@ export function usePlayground(initial?: { mode?: AppMode; sizePresetId?: string 
     void loadTheme(theme);
   }, [theme]);
 
+  useEffect(() => {
+    persistReady.current = true;
+  }, []);
+
   const parsedLineHighlights = useMemo(
     () =>
       lineHighlights
@@ -125,32 +206,20 @@ export function usePlayground(initial?: { mode?: AppMode; sizePresetId?: string 
   }, [enableDiffHighlights, code, detectedLang, language, languageManual]);
 
   useEffect(() => {
-    savePersisted({
-      mode,
-      code,
-      language,
-      theme: effectiveTheme,
-      ogTitle,
-      ogSubtitle,
-      ogAccent,
-      brandTemplateId,
-      ogTemplateJson,
-      exportFormat,
-      exportDpi,
-    });
-  }, [
-    mode,
-    code,
-    language,
-    effectiveTheme,
-    ogTitle,
-    ogSubtitle,
-    ogAccent,
-    brandTemplateId,
-    ogTemplateJson,
-    exportFormat,
-    exportDpi,
-  ]);
+    if (!persistReady.current || blockPersistRef.current) return;
+    savePersisted(snapshotToPersisted(snapshot));
+  }, [snapshot]);
+
+  const applyOgTemplateFromParsed = useCallback(
+    (parsed: ReturnType<typeof parseOgTemplateJson>) => {
+      if (parsed.templateId) setBrandTemplateId(parsed.templateId);
+      const v = parsed.variables ?? {};
+      if (v.title !== undefined) setOgTitle(v.title);
+      if (v.subtitle !== undefined) setOgSubtitle(v.subtitle);
+      if (v.accentColor !== undefined) setOgAccent(v.accentColor);
+    },
+    [],
+  );
 
   const syncOgTemplateFromVars = useCallback(() => {
     setOgTemplateJson(
@@ -165,17 +234,6 @@ export function usePlayground(initial?: { mode?: AppMode; sizePresetId?: string 
     );
   }, [brandTemplateId, ogTitle, ogSubtitle, ogAccent]);
 
-  const applyOgTemplateFromParsed = useCallback(
-    (parsed: ReturnType<typeof parseOgTemplateJson>) => {
-      if (parsed.templateId) setBrandTemplateId(parsed.templateId);
-      const v = parsed.variables ?? {};
-      if (v.title !== undefined) setOgTitle(v.title);
-      if (v.subtitle !== undefined) setOgSubtitle(v.subtitle);
-      if (v.accentColor !== undefined) setOgAccent(v.accentColor);
-    },
-    [],
-  );
-
   const applyOgTemplateJson = useCallback(() => {
     try {
       const parsed = parseOgTemplateJson(ogTemplateJson);
@@ -188,113 +246,99 @@ export function usePlayground(initial?: { mode?: AppMode; sizePresetId?: string 
     }
   }, [ogTemplateJson, applyOgTemplateFromParsed]);
 
+  const applySnapshot = useCallback((next: PlaygroundSnapshot) => {
+      setModeState(next.mode);
+      setCode(next.code);
+      setLanguage(next.language);
+      setLanguageManual(next.languageManual);
+      setTheme(next.theme);
+      setCustomThemeJson(next.customThemeJson);
+      setWindowChrome(next.windowChrome);
+      setShowLineNumbers(next.showLineNumbers);
+      setLineHighlights(next.lineHighlights);
+      setEnableDiffHighlights(next.enableDiffHighlights);
+      setPadding(next.padding);
+      setShadow(next.shadow);
+      setGradient(next.gradient);
+      setFontFamily(next.fontFamily);
+      setCustomFontCss(next.customFontCss);
+      setFontSize(next.fontSize);
+      setLigatures(next.ligatures);
+      setOgTitle(next.ogTitle);
+      setOgSubtitle(next.ogSubtitle);
+      setOgAccent(next.ogAccent);
+      setBrandTemplateId(next.brandTemplateId);
+      setOgTemplateJson(next.ogTemplateJson);
+      setOgLogoDataUrl(next.ogLogoDataUrl);
+      setCodeSizePresetId(next.codeSizePresetId);
+      setOgSizePresetId(next.ogSizePresetId);
+      setExportFormat(next.exportFormat);
+      setExportDpi(next.exportDpi);
+    },
+    [],
+  );
+
   const hydrateFromHash = useCallback(() => {
     const fromHash = decodeShareState(window.location.hash);
     if (!fromHash) return;
-    setModeState(fromHash.mode);
-    const p = fromHash.payload;
-    if (typeof p.code === "string") setCode(p.code);
-    if (typeof p.language === "string") {
-      setLanguage(p.language);
-      setLanguageManual(p.language !== "auto");
-    }
-    if (typeof p.theme === "string") setTheme(p.theme);
-    if (typeof p.codeSizePresetId === "string") setCodeSizePresetId(p.codeSizePresetId);
-    if (typeof p.ogSizePresetId === "string") setOgSizePresetId(p.ogSizePresetId);
-    if (typeof p.ogTemplateJson === "string") {
-      setOgTemplateJson(p.ogTemplateJson);
+
+    let next = mergeFromPayload(snapshot, fromHash.payload, fromHash.mode);
+    let ogJsonWarning = "";
+
+    if (typeof fromHash.payload.ogTemplateJson === "string") {
       try {
-        const parsed = parseOgTemplateJson(p.ogTemplateJson);
-        applyOgTemplateFromParsed(parsed);
+        const parsed = parseOgTemplateJson(fromHash.payload.ogTemplateJson);
+        if (parsed.templateId) next = { ...next, brandTemplateId: parsed.templateId };
         const v = parsed.variables ?? {};
-        if (v.title === undefined && typeof p.ogTitle === "string") setOgTitle(p.ogTitle);
+        if (v.title !== undefined) next = { ...next, ogTitle: v.title };
+        if (v.subtitle !== undefined) next = { ...next, ogSubtitle: v.subtitle };
+        if (v.accentColor !== undefined) next = { ...next, ogAccent: v.accentColor };
+        const p = fromHash.payload;
+        if (v.title === undefined && typeof p.ogTitle === "string")
+          next = { ...next, ogTitle: p.ogTitle };
         if (v.subtitle === undefined && typeof p.ogSubtitle === "string")
-          setOgSubtitle(p.ogSubtitle);
+          next = { ...next, ogSubtitle: p.ogSubtitle };
         if (v.accentColor === undefined && typeof p.ogAccent === "string")
-          setOgAccent(p.ogAccent);
+          next = { ...next, ogAccent: p.ogAccent };
         if (!parsed.templateId && typeof p.brandTemplateId === "string")
-          setBrandTemplateId(p.brandTemplateId);
-        setOgJsonError("");
-      } catch (e) {
-        setOgJsonError(e instanceof Error ? e.message : "Invalid template JSON in share link");
-        if (typeof p.ogTitle === "string") setOgTitle(p.ogTitle);
-        if (typeof p.ogSubtitle === "string") setOgSubtitle(p.ogSubtitle);
-        if (typeof p.brandTemplateId === "string") setBrandTemplateId(p.brandTemplateId);
-        if (typeof p.ogAccent === "string") setOgAccent(p.ogAccent);
+          next = { ...next, brandTemplateId: p.brandTemplateId };
+      } catch {
+        ogJsonWarning = "Template JSON in share link was invalid — other fields were restored";
       }
-    } else {
-      if (typeof p.ogTitle === "string") setOgTitle(p.ogTitle);
-      if (typeof p.ogSubtitle === "string") setOgSubtitle(p.ogSubtitle);
-      if (typeof p.brandTemplateId === "string") setBrandTemplateId(p.brandTemplateId);
-      if (typeof p.ogAccent === "string") setOgAccent(p.ogAccent);
     }
-  }, [applyOgTemplateFromParsed]);
+
+    applySnapshot(next);
+    if (ogJsonWarning) setStatus(ogJsonWarning);
+  }, [snapshot, applySnapshot]);
 
   useEffect(() => {
-    hydrateFromHash();
-    window.addEventListener("hashchange", hydrateFromHash);
-    return () => window.removeEventListener("hashchange", hydrateFromHash);
+    const onHashChange = () => hydrateFromHash();
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
   }, [hydrateFromHash]);
 
-  const buildOgShareJson = useCallback(
-    () =>
-      JSON.stringify(
-        {
-          templateId: brandTemplateId,
-          variables: { title: ogTitle, subtitle: ogSubtitle, accentColor: ogAccent },
-        },
-        null,
-        2,
-      ),
-    [brandTemplateId, ogTitle, ogSubtitle, ogAccent],
-  );
-
   const shareUrl = useCallback(async () => {
-    const hash = encodeShareState({
-      mode,
-      payload:
-        mode === "code"
-          ? {
-              code,
-              language: languageManual && language !== "auto" ? language : "auto",
-              theme: effectiveTheme,
-              codeSizePresetId,
-              ogSizePresetId,
-            }
-          : {
-              ogTitle,
-              ogSubtitle,
-              brandTemplateId,
-              ogAccent,
-              ogTemplateJson: buildOgShareJson(),
-              codeSizePresetId,
-              ogSizePresetId,
-            },
-    });
-    const url = `${window.location.origin}${window.location.pathname}${hash}`;
-    window.location.hash = hash.slice(1);
     try {
-      await navigator.clipboard.writeText(url);
-      setStatus("Share link copied to clipboard");
-    } catch {
-      setStatus("Share URL updated — copy from the address bar");
+      const hash = encodeShareState({
+        mode,
+        payload:
+          mode === "code" ? buildCodeSharePayload(snapshot) : buildOgSharePayload(snapshot),
+      });
+      const url = `${window.location.origin}${window.location.pathname}${hash}`;
+      window.location.hash = hash.slice(1);
+      try {
+        await navigator.clipboard.writeText(url);
+        setStatus("Share link copied to clipboard");
+      } catch {
+        setStatus("Share URL updated — copy from the address bar");
+      }
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : "Share failed");
     }
-  }, [
-    mode,
-    code,
-    language,
-    languageManual,
-    effectiveTheme,
-    ogTitle,
-    ogSubtitle,
-    brandTemplateId,
-    ogAccent,
-    buildOgShareJson,
-    codeSizePresetId,
-    ogSizePresetId,
-  ]);
+  }, [mode, snapshot]);
 
   const applyBrandTemplate = (id: string) => {
+    blockPersistRef.current = false;
     const t = BRAND_TEMPLATES.find((b) => b.id === id);
     if (!t) return;
     setBrandTemplateId(id);
@@ -315,6 +359,7 @@ export function usePlayground(initial?: { mode?: AppMode; sizePresetId?: string 
         2,
       ),
     );
+    setOgJsonError("");
   };
 
   const handleFontUpload = (file: File) => {
@@ -337,70 +382,89 @@ export function usePlayground(initial?: { mode?: AppMode; sizePresetId?: string 
   };
 
   const clearLocalData = () => {
+    blockPersistRef.current = true;
     clearPersisted();
+    let reset: PlaygroundSnapshot = { ...PLAYGROUND_DEFAULTS };
+    if (initial?.mode) {
+      reset.mode = initial.mode;
+      if (initial.sizePresetId) {
+        if (initial.mode === "og") reset.ogSizePresetId = initial.sizePresetId;
+        else reset.codeSizePresetId = initial.sizePresetId;
+      }
+    }
+    applySnapshot(reset);
+    setPreviewHtml("");
+    setPreviewSvg("");
+    setPreviewError("");
     setStatus("Local preferences cleared");
   };
+
+  const setMode = useCallback((next: AppMode) => {
+    blockPersistRef.current = false;
+    setModeState(next);
+  }, []);
 
   return {
     mode,
     setMode,
     code,
-    setCode,
+    setCode: withPersist(setCode),
     language,
-    setLanguage,
+    setLanguage: withPersist(setLanguage),
     languageManual,
-    setLanguageManual,
+    setLanguageManual: withPersist(setLanguageManual),
     theme,
-    setTheme,
+    setTheme: withPersist(setTheme),
     customThemeJson,
-    setCustomThemeJson,
+    setCustomThemeJson: withPersist(setCustomThemeJson),
+    customThemeName,
     effectiveTheme,
     windowChrome,
-    setWindowChrome,
+    setWindowChrome: withPersist(setWindowChrome),
     showLineNumbers,
-    setShowLineNumbers,
+    setShowLineNumbers: withPersist(setShowLineNumbers),
     lineHighlights,
-    setLineHighlights,
+    setLineHighlights: withPersist(setLineHighlights),
     parsedLineHighlights,
     enableDiffHighlights,
-    setEnableDiffHighlights,
+    setEnableDiffHighlights: withPersist(setEnableDiffHighlights),
     diffHighlights,
     padding,
-    setPadding,
+    setPadding: withPersist(setPadding),
     shadow,
-    setShadow,
+    setShadow: withPersist(setShadow),
     gradient,
-    setGradient,
+    setGradient: withPersist(setGradient),
     fontFamily,
-    setFontFamily,
+    setFontFamily: withPersist(setFontFamily),
     customFontCss,
     fontSize,
-    setFontSize,
+    setFontSize: withPersist(setFontSize),
     ligatures,
-    setLigatures,
+    setLigatures: withPersist(setLigatures),
     ogTitle,
-    setOgTitle,
+    setOgTitle: withPersist(setOgTitle),
     ogSubtitle,
-    setOgSubtitle,
+    setOgSubtitle: withPersist(setOgSubtitle),
     ogAccent,
-    setOgAccent,
+    setOgAccent: withPersist(setOgAccent),
     brandTemplateId,
     applyBrandTemplate,
     ogTemplateJson,
-    setOgTemplateJson,
+    setOgTemplateJson: withPersist(setOgTemplateJson),
     applyOgTemplateJson,
     syncOgTemplateFromVars,
     ogLogoDataUrl,
-    setOgLogoDataUrl,
+    setOgLogoDataUrl: withPersist(setOgLogoDataUrl),
     handleFontUpload,
     handleLogoUpload,
     sizePresetId,
     setSizePresetId,
     sizePreset,
     exportFormat,
-    setExportFormat,
+    setExportFormat: withPersist(setExportFormat),
     exportDpi,
-    setExportDpi,
+    setExportDpi: withPersist(setExportDpi),
     previewHtml,
     setPreviewHtml,
     previewSvg,

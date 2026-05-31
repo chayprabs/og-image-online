@@ -5,11 +5,26 @@ export interface PersistedState {
   code?: string;
   language?: string;
   theme?: string;
+  customThemeJson?: string;
+  windowChrome?: string;
+  showLineNumbers?: boolean;
+  lineHighlights?: string;
+  enableDiffHighlights?: boolean;
+  padding?: number;
+  shadow?: boolean;
+  gradient?: boolean;
+  fontFamily?: string;
+  customFontCss?: string;
+  fontSize?: number;
+  ligatures?: boolean;
+  codeSizePresetId?: string;
+  ogSizePresetId?: string;
   ogTitle?: string;
   ogSubtitle?: string;
   ogAccent?: string;
   brandTemplateId?: string;
   ogTemplateJson?: string;
+  ogLogoDataUrl?: string;
   exportFormat?: string;
   exportDpi?: number;
 }

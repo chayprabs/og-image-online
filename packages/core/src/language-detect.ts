@@ -49,7 +49,7 @@ const PATTERNS: [RegExp, string][] = [
 ];
 
 export function detectLanguage(code: string, hint?: string): string {
-  if (hint && hint !== "auto" && hint !== "plaintext") return hint;
+  if (hint && hint !== "auto") return hint;
   for (const [pattern, lang] of PATTERNS) {
     if (pattern.test(code)) return lang;
   }

@@ -10,8 +10,8 @@ export function parseDiffHighlights(code: string): DiffHighlight[] {
   const result: DiffHighlight[] = [];
   let lineNum = 0;
   for (const line of lines) {
-    if (line.startsWith("@@")) continue;
     lineNum += 1;
+    if (line.startsWith("@@")) continue;
     if (line.startsWith("+") && !line.startsWith("+++")) {
       result.push({ line: lineNum, type: "add" });
     } else if (line.startsWith("-") && !line.startsWith("---")) {

@@ -16,4 +16,15 @@ describe("parseDiffHighlights", () => {
 +another line`;
     expect(parseDiffHighlights(code)).toEqual([]);
   });
+
+  it("aligns highlights with rendered Shiki lines for unified diff sample", () => {
+    const code = `@@ -1,3 +1,4 @@
+-const old = true;
++const updated = true;
++export { updated };`;
+    const h = parseDiffHighlights(code);
+    expect(h).toContainEqual({ line: 2, type: "remove" });
+    expect(h).toContainEqual({ line: 3, type: "add" });
+    expect(h).toContainEqual({ line: 4, type: "add" });
+  });
 });

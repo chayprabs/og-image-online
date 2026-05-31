@@ -99,6 +99,7 @@ test.describe("persistence", () => {
 
     await page.getByTitle("Clear saved preferences").click();
     await expect(page.getByText("Local preferences cleared")).toBeVisible();
+    await expect(page.getByLabel("Code")).not.toHaveValue("OLD");
 
     const stored = await page.evaluate(() => localStorage.getItem("social-render:v1"));
     expect(stored).toBeNull();

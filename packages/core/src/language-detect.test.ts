@@ -39,4 +39,8 @@ describe("detectLanguage", () => {
   it("respects manual override", () => {
     expect(detectLanguage("anything", "go")).toBe("go");
   });
+
+  it("respects plaintext manual hint", () => {
+    expect(detectLanguage('fn main() { println!("hi"); }', "plaintext")).toBe("plaintext");
+  });
 });

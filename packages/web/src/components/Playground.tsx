@@ -45,8 +45,10 @@ export default function Playground({
   const pg = usePlayground({ mode: initialMode, sizePresetId: initialSizePresetId });
   const previewRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const previewGenRef = useRef(0);
 
   const refreshPreview = useCallback(async () => {
+    const gen = ++previewGenRef.current;
     try {
       if (pg.mode === "code") {
         const html = await updateCodePreview({
@@ -67,10 +69,12 @@ export default function Playground({
           width: pg.sizePreset.width,
           height: pg.sizePreset.height,
         });
+        if (gen !== previewGenRef.current) return;
         pg.setPreviewHtml(html);
         pg.setPreviewSvg("");
         pg.setPreviewError("");
       } else if (pg.ogJsonError) {
+        if (gen !== previewGenRef.current) return;
         pg.setPreviewSvg("");
         pg.setPreviewHtml("");
       } else {
@@ -83,11 +87,13 @@ export default function Playground({
           pg.sizePreset.height,
           pg.ogLogoDataUrl,
         );
+        if (gen !== previewGenRef.current) return;
         pg.setPreviewSvg(svg);
         pg.setPreviewHtml("");
         pg.setPreviewError("");
       }
     } catch (e) {
+      if (gen !== previewGenRef.current) return;
       const msg = e instanceof Error ? e.message : "Preview failed";
       pg.setPreviewError(msg);
       pg.setPreviewSvg("");
@@ -129,6 +135,10 @@ export default function Playground({
   }, [refreshPreview]);
 
   const handleExport = async () => {
+    if (pg.mode === "og" && pg.ogJsonError) {
+      pg.setStatus(pg.ogJsonError);
+      return;
+    }
     pg.setBusy(true);
     pg.setStatus("");
     try {
@@ -185,6 +195,10 @@ export default function Playground({
   const sizePresets = pg.mode === "code" ? CODE_SIZE_PRESETS : SIZE_PRESETS;
 
   const handleCopy = async () => {
+    if (pg.mode === "og" && pg.ogJsonError) {
+      pg.setStatus(pg.ogJsonError);
+      return;
+    }
     pg.setBusy(true);
     try {
       if (pg.mode === "code") {
@@ -208,7 +222,7 @@ export default function Playground({
             width: pg.sizePreset.width,
             height: pg.sizePreset.height,
           }));
-        const { blob } = await exportCodeFromHtml(html, "png", 1);
+        const { blob } = await exportCodeFromHtml(html, pg.exportFormat, pg.exportDpi);
         await copyBlobToClipboard(blob);
       } else {
         const svg = await updateOgFromFields(
@@ -224,8 +238,8 @@ export default function Playground({
           svg,
           pg.sizePreset.width,
           pg.sizePreset.height,
-          "png",
-          1,
+          pg.exportFormat,
+          pg.exportDpi,
         );
         await copyBlobToClipboard(blob);
       }
@@ -315,7 +329,10 @@ export default function Playground({
                   <span className="font-medium text-gray-700">Theme</span>
                   <select
                     value={pg.theme}
-                    onChange={(e) => pg.setTheme(e.target.value)}
+                    onChange={(e) => {
+                      pg.setTheme(e.target.value);
+                      pg.setCustomThemeJson("");
+                    }}
                     className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm"
                   >
                     {BUILTIN_THEMES.map((t) => (
@@ -324,6 +341,11 @@ export default function Playground({
                       </option>
                     ))}
                   </select>
+                  {pg.customThemeName ? (
+                    <span className="mt-0.5 block text-xs text-gray-500">
+                      Active custom theme: {pg.customThemeName}
+                    </span>
+                  ) : null}
                 </label>
 
                 <label className="text-sm">
@@ -412,7 +434,10 @@ export default function Playground({
                     <input
                       type="number"
                       value={pg.padding}
-                      onChange={(e) => pg.setPadding(Number(e.target.value))}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        pg.setPadding(Number.isFinite(n) ? n : 24);
+                      }}
                       className="mt-1 w-full rounded border border-gray-200 px-2 py-1"
                     />
                   </label>
@@ -507,10 +532,7 @@ export default function Playground({
                 </summary>
                 <textarea
                   value={pg.ogTemplateJson}
-                  onChange={(e) => {
-                    pg.setOgTemplateJson(e.target.value);
-                    if (pg.ogJsonError) pg.setOgJsonError("");
-                  }}
+                  onChange={(e) => pg.setOgTemplateJson(e.target.value)}
                   rows={8}
                   className="mt-2 w-full resize-y rounded border border-gray-200 p-2 font-mono text-xs"
                   spellCheck={false}
@@ -673,6 +695,8 @@ export default function Playground({
             />
           ) : pg.previewError ? (
             <p className="text-sm text-red-600">{pg.previewError}</p>
+          ) : pg.mode === "og" && pg.ogJsonError ? (
+            <p className="text-sm text-red-600">{pg.ogJsonError}</p>
           ) : (
             <p className="text-sm text-gray-500">Generating preview…</p>
           )}
