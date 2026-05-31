@@ -80,6 +80,9 @@ export default function Layout({ children }: { children: ReactNode }) {
           <Link to="/terms" className="hover:text-gray-800">
             Terms & Conditions
           </Link>
+          <Link to="/license" className="hover:text-gray-800">
+            License
+          </Link>
         </div>
       </footer>
     </div>

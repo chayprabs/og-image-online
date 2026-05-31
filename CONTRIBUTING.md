@@ -2,6 +2,11 @@
 
 Thank you for contributing to SocialRender.
 
+By submitting a pull request or other contribution, you represent that you have
+the right to submit the work and you license your contribution under the same
+MIT License that covers the project (see [LICENSE](LICENSE)), unless otherwise
+noted. You agree your contribution is provided “as is” without warranty.
+
 ## Development
 
 1. Fork and clone the repository.

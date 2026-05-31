@@ -1,0 +1,23 @@
+SocialRender — Third-Party Notices
+====================================
+
+This project includes open-source software. The Service source code is
+licensed under the MIT License (see LICENSE).
+
+The following components are used under their respective licenses:
+
+- React — MIT License
+- Vite — MIT License
+- Tailwind CSS — MIT License
+- Shiki — MIT License
+- Satori — MPL-2.0 (verify current license in package metadata)
+- Lucide icons — ISC License
+- Inter font — SIL Open Font License 1.1 (when bundled under public/fonts/)
+
+For exact versions and license texts, see package.json, pnpm-lock.yaml, and
+the node_modules directories of dependencies after install.
+
+Website use of SocialRender (the hosted application) is also governed by the
+Terms & Conditions and Privacy Policy (legal/TERMS.md, legal/PRIVACY.md, and
+the /terms and /privacy pages on the deployed site). The MIT License in LICENSE
+applies to source code; it does not replace those website terms.

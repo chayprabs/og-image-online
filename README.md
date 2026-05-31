@@ -85,9 +85,17 @@ import {
 
 `og-image` · `open-graph` · `social-card` · `code-screenshot` · `shiki` · `carbon` · `code-image` · `social-media` · `twitter-card` · `linkedin-preview` · `brand-templates` · `marketing-images` · `syntax-highlighting` · `online-tool` · `og-image-generator`
 
-## License
+## Legal
 
-MIT — see [LICENSE](LICENSE).
+| Document | Location |
+| -------- | -------- |
+| Privacy Policy | [/privacy](packages/web/src/content/legal.ts) on site · [legal/PRIVACY.md](legal/PRIVACY.md) |
+| Terms & Conditions | [/terms](packages/web/src/content/legal.ts) on site · [legal/TERMS.md](legal/TERMS.md) |
+| MIT License (code) | [LICENSE](LICENSE) |
+| Third-party notices | [NOTICE](NOTICE) |
+
+Use of the hosted Service is subject to the Terms and Privacy Policy. The MIT
+License governs the source code; it does not replace website terms.
 
 ## Security
 
