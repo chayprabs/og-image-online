@@ -11,7 +11,8 @@ const fontPath = join(
 
 describe("renderOG", () => {
   it("renders SVG with loaded font", async () => {
-    const data = readFileSync(fontPath);
+    const buf = readFileSync(fontPath);
+    const data = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
     const fonts = [{ name: "Inter", data, weight: 400 as const, style: "normal" as const }];
     const svg = await renderOG(
       {
