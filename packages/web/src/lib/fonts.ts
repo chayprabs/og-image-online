@@ -4,7 +4,7 @@ let cachedFonts: SatoriFont[] | null = null;
 
 export async function loadOgFonts(): Promise<SatoriFont[]> {
   if (cachedFonts) return cachedFonts;
-  const res = await fetch("/fonts/Inter-Regular.otf");
+  const res = await fetch("/fonts/Inter-Regular.ttf");
   if (!res.ok) throw new Error("Failed to load OG font");
   const data = await res.arrayBuffer();
   cachedFonts = [
