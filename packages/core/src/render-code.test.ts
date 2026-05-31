@@ -40,3 +40,27 @@ describe("loadCustomTheme", () => {
     expect(viaCustom).toBe(viaLoadTheme);
   });
 });
+
+describe("renderCodeToHtml plaintext", () => {
+  it("renders auto-detected plaintext without error", async () => {
+    const html = await renderCodeToHtml({
+      code: "Hello world\nplain text",
+      language: "plaintext",
+      theme: "github-dark",
+      windowChrome: "none",
+      showLineNumbers: false,
+      lineHighlights: [],
+      diffHighlights: [],
+      padding: 8,
+      shadow: false,
+      gradient: false,
+      fontFamily: "monospace",
+      fontSize: 14,
+      ligatures: false,
+      width: 400,
+      height: 200,
+    });
+    expect(html).toContain("Hello world");
+    expect(html).toContain("shiki");
+  });
+});

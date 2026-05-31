@@ -5,6 +5,7 @@ export interface DiffHighlight {
 
 /** Parse unified diff markers (+/-) into line highlight metadata. */
 export function parseDiffHighlights(code: string): DiffHighlight[] {
+  if (!/^\s*@@/m.test(code)) return [];
   const lines = code.split("\n");
   const result: DiffHighlight[] = [];
   let lineNum = 0;

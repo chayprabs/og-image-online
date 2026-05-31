@@ -25,15 +25,21 @@ async function getHighlighter(): Promise<import("shiki").Highlighter> {
   return highlighterPromise;
 }
 
+/** Shiki has no `plaintext` grammar; map to bundled `text`. */
+export function resolveShikiLanguage(lang: string): string {
+  return lang === "plaintext" ? "text" : lang;
+}
+
 export async function loadLanguage(lang: string): Promise<void> {
-  if (loadedLangs.has(lang)) return;
+  const resolved = resolveShikiLanguage(lang);
+  if (loadedLangs.has(resolved)) return;
   const { bundledLanguages } = await import("shiki/langs");
   const highlighter = await getHighlighter();
-  const loader = (bundledLanguages as Record<string, () => Promise<unknown>>)[lang];
+  const loader = (bundledLanguages as Record<string, () => Promise<unknown>>)[resolved];
   if (loader) {
     const langModule = await loader();
     await highlighter.loadLanguage(langModule as import("shiki").LanguageInput);
-    loadedLangs.add(lang);
+    loadedLangs.add(resolved);
   }
 }
 
@@ -86,7 +92,8 @@ function buildChrome(chrome: CodeRenderOptions["windowChrome"], title: string): 
 }
 
 export async function renderCodeToHtml(opts: CodeRenderOptions): Promise<string> {
-  await loadLanguage(opts.language);
+  const shikiLang = resolveShikiLanguage(opts.language);
+  await loadLanguage(shikiLang);
   await loadTheme(opts.theme);
   const highlighter = await getHighlighter();
   if (!highlighter.getLoadedThemes().includes(opts.theme)) {
@@ -97,7 +104,7 @@ export async function renderCodeToHtml(opts: CodeRenderOptions): Promise<string>
   const themeName = opts.theme;
 
   let html = highlighter.codeToHtml(opts.code, {
-    lang: opts.language,
+    lang: shikiLang,
     theme: themeName,
   });
 

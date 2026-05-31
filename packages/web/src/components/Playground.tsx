@@ -70,6 +70,9 @@ export default function Playground({
         pg.setPreviewHtml(html);
         pg.setPreviewSvg("");
         pg.setPreviewError("");
+      } else if (pg.ogJsonError) {
+        pg.setPreviewSvg("");
+        pg.setPreviewHtml("");
       } else {
         const svg = await updateOgFromFields(
           pg.brandTemplateId,
@@ -90,7 +93,34 @@ export default function Playground({
       pg.setPreviewSvg("");
       pg.setPreviewHtml("");
     }
-  }, [pg]);
+  }, [
+    pg.mode,
+    pg.code,
+    pg.detectedLang,
+    pg.effectiveTheme,
+    pg.windowChrome,
+    pg.showLineNumbers,
+    pg.parsedLineHighlights,
+    pg.diffHighlights,
+    pg.padding,
+    pg.shadow,
+    pg.gradient,
+    pg.fontFamily,
+    pg.fontSize,
+    pg.ligatures,
+    pg.customFontCss,
+    pg.sizePreset.width,
+    pg.sizePreset.height,
+    pg.brandTemplateId,
+    pg.ogTitle,
+    pg.ogSubtitle,
+    pg.ogAccent,
+    pg.ogLogoDataUrl,
+    pg.ogJsonError,
+    pg.setPreviewHtml,
+    pg.setPreviewSvg,
+    pg.setPreviewError,
+  ]);
 
   useEffect(() => {
     clearTimeout(debounceRef.current);
@@ -422,6 +452,7 @@ export default function Playground({
                         pg.setCode(s.code);
                         pg.setLanguage(s.language);
                         pg.setLanguageManual(true);
+                        if (s.language === "diff") pg.setEnableDiffHighlights(true);
                       }}
                       className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700 hover:bg-gray-200"
                     >
@@ -476,7 +507,10 @@ export default function Playground({
                 </summary>
                 <textarea
                   value={pg.ogTemplateJson}
-                  onChange={(e) => pg.setOgTemplateJson(e.target.value)}
+                  onChange={(e) => {
+                    pg.setOgTemplateJson(e.target.value);
+                    if (pg.ogJsonError) pg.setOgJsonError("");
+                  }}
                   rows={8}
                   className="mt-2 w-full resize-y rounded border border-gray-200 p-2 font-mono text-xs"
                   spellCheck={false}
@@ -491,12 +525,20 @@ export default function Playground({
                   </button>
                   <button
                     type="button"
-                    onClick={pg.syncOgTemplateFromVars}
+                    onClick={() => {
+                      pg.syncOgTemplateFromVars();
+                      pg.setOgJsonError("");
+                    }}
                     className="rounded bg-gray-100 px-3 py-1 text-xs text-gray-700"
                   >
                     Sync from fields
                   </button>
                 </div>
+                {pg.ogJsonError ? (
+                  <p className="mt-2 text-sm text-red-600" role="alert">
+                    {pg.ogJsonError}
+                  </p>
+                ) : null}
               </details>
               <div>
                 <span className="text-sm font-medium text-gray-700">Brand templates</span>

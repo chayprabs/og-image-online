@@ -67,4 +67,16 @@ describe("share edge cases", () => {
     expect(decodeShareState("#other=abc")).toBeNull();
     expect(decodeShareState("")).toBeNull();
   });
+
+  it("returns null for invalid mode in payload", () => {
+    const bad = btoa(unescape(encodeURIComponent(JSON.stringify({ mode: "nope", payload: {} }))));
+    expect(decodeShareState(`#s=${bad}`)).toBeNull();
+  });
+
+  it("throws when encoding oversized share state", () => {
+    const huge = "x".repeat(70 * 1024);
+    expect(() =>
+      encodeShareState({ mode: "code", payload: { code: huge, language: "auto", theme: "nord" } }),
+    ).toThrow(/too large/i);
+  });
 });

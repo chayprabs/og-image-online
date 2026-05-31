@@ -27,5 +27,6 @@ test("invalid OG template JSON clears preview and shows error", async ({ page })
   const editor = page.locator('details:has(summary:text("Template JSON editor")) textarea');
   await editor.fill("{ broken");
   await page.getByRole("button", { name: "Apply JSON" }).click();
-  await expect(page.locator("p.text-red-600")).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole("alert")).toContainText(/invalid|json/i, { timeout: 5000 });
+  await expect(page.locator('[aria-label="OG image preview"] svg')).toHaveCount(0);
 });

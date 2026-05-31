@@ -10,4 +10,10 @@ describe("parseDiffHighlights", () => {
     expect(h.some((x) => x.type === "remove")).toBe(true);
     expect(h.some((x) => x.type === "add")).toBe(true);
   });
+
+  it("ignores plus-prefixed lines without diff hunk headers", () => {
+    const code = `+console.log("not a diff");
++another line`;
+    expect(parseDiffHighlights(code)).toEqual([]);
+  });
 });

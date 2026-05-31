@@ -66,6 +66,7 @@ export function usePlayground(initial?: { mode?: AppMode; sizePresetId?: string 
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewSvg, setPreviewSvg] = useState("");
   const [previewError, setPreviewError] = useState("");
+  const [ogJsonError, setOgJsonError] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
 
@@ -118,11 +119,10 @@ export function usePlayground(initial?: { mode?: AppMode; sizePresetId?: string 
 
   const diffHighlights = useMemo(() => {
     if (!enableDiffHighlights) return [];
-    if (detectedLang === "diff" || code.includes("\n+") || code.includes("\n-")) {
-      return parseDiffHighlights(code);
-    }
+    const lang = languageManual ? language : detectedLang;
+    if (lang === "diff") return parseDiffHighlights(code);
     return [];
-  }, [enableDiffHighlights, code, detectedLang]);
+  }, [enableDiffHighlights, code, detectedLang, language, languageManual]);
 
   useEffect(() => {
     savePersisted({
@@ -165,20 +165,28 @@ export function usePlayground(initial?: { mode?: AppMode; sizePresetId?: string 
     );
   }, [brandTemplateId, ogTitle, ogSubtitle, ogAccent]);
 
+  const applyOgTemplateFromParsed = useCallback(
+    (parsed: ReturnType<typeof parseOgTemplateJson>) => {
+      if (parsed.templateId) setBrandTemplateId(parsed.templateId);
+      const v = parsed.variables ?? {};
+      if (v.title !== undefined) setOgTitle(v.title);
+      if (v.subtitle !== undefined) setOgSubtitle(v.subtitle);
+      if (v.accentColor !== undefined) setOgAccent(v.accentColor);
+    },
+    [],
+  );
+
   const applyOgTemplateJson = useCallback(() => {
     try {
       const parsed = parseOgTemplateJson(ogTemplateJson);
-      if (parsed.templateId) setBrandTemplateId(parsed.templateId);
-      const v = parsed.variables ?? {};
-      if (v.title) setOgTitle(v.title);
-      if (v.subtitle) setOgSubtitle(v.subtitle);
-      if (v.accentColor) setOgAccent(v.accentColor);
+      applyOgTemplateFromParsed(parsed);
+      setOgJsonError("");
       setPreviewError("");
     } catch (e) {
-      setPreviewError(e instanceof Error ? e.message : "Invalid template JSON");
+      setOgJsonError(e instanceof Error ? e.message : "Invalid template JSON");
       setPreviewSvg("");
     }
-  }, [ogTemplateJson]);
+  }, [ogTemplateJson, applyOgTemplateFromParsed]);
 
   const hydrateFromHash = useCallback(() => {
     const fromHash = decodeShareState(window.location.hash);
@@ -191,12 +199,36 @@ export function usePlayground(initial?: { mode?: AppMode; sizePresetId?: string 
       setLanguageManual(p.language !== "auto");
     }
     if (typeof p.theme === "string") setTheme(p.theme);
-    if (typeof p.ogTitle === "string") setOgTitle(p.ogTitle);
-    if (typeof p.ogSubtitle === "string") setOgSubtitle(p.ogSubtitle);
-    if (typeof p.brandTemplateId === "string") setBrandTemplateId(p.brandTemplateId);
-    if (typeof p.ogAccent === "string") setOgAccent(p.ogAccent);
-    if (typeof p.ogTemplateJson === "string") setOgTemplateJson(p.ogTemplateJson);
-  }, []);
+    if (typeof p.codeSizePresetId === "string") setCodeSizePresetId(p.codeSizePresetId);
+    if (typeof p.ogSizePresetId === "string") setOgSizePresetId(p.ogSizePresetId);
+    if (typeof p.ogTemplateJson === "string") {
+      setOgTemplateJson(p.ogTemplateJson);
+      try {
+        const parsed = parseOgTemplateJson(p.ogTemplateJson);
+        applyOgTemplateFromParsed(parsed);
+        const v = parsed.variables ?? {};
+        if (v.title === undefined && typeof p.ogTitle === "string") setOgTitle(p.ogTitle);
+        if (v.subtitle === undefined && typeof p.ogSubtitle === "string")
+          setOgSubtitle(p.ogSubtitle);
+        if (v.accentColor === undefined && typeof p.ogAccent === "string")
+          setOgAccent(p.ogAccent);
+        if (!parsed.templateId && typeof p.brandTemplateId === "string")
+          setBrandTemplateId(p.brandTemplateId);
+        setOgJsonError("");
+      } catch (e) {
+        setOgJsonError(e instanceof Error ? e.message : "Invalid template JSON in share link");
+        if (typeof p.ogTitle === "string") setOgTitle(p.ogTitle);
+        if (typeof p.ogSubtitle === "string") setOgSubtitle(p.ogSubtitle);
+        if (typeof p.brandTemplateId === "string") setBrandTemplateId(p.brandTemplateId);
+        if (typeof p.ogAccent === "string") setOgAccent(p.ogAccent);
+      }
+    } else {
+      if (typeof p.ogTitle === "string") setOgTitle(p.ogTitle);
+      if (typeof p.ogSubtitle === "string") setOgSubtitle(p.ogSubtitle);
+      if (typeof p.brandTemplateId === "string") setBrandTemplateId(p.brandTemplateId);
+      if (typeof p.ogAccent === "string") setOgAccent(p.ogAccent);
+    }
+  }, [applyOgTemplateFromParsed]);
 
   useEffect(() => {
     hydrateFromHash();
@@ -204,18 +236,39 @@ export function usePlayground(initial?: { mode?: AppMode; sizePresetId?: string 
     return () => window.removeEventListener("hashchange", hydrateFromHash);
   }, [hydrateFromHash]);
 
+  const buildOgShareJson = useCallback(
+    () =>
+      JSON.stringify(
+        {
+          templateId: brandTemplateId,
+          variables: { title: ogTitle, subtitle: ogSubtitle, accentColor: ogAccent },
+        },
+        null,
+        2,
+      ),
+    [brandTemplateId, ogTitle, ogSubtitle, ogAccent],
+  );
+
   const shareUrl = useCallback(async () => {
     const hash = encodeShareState({
       mode,
       payload:
         mode === "code"
-          ? { code, language: detectedLang, theme: effectiveTheme }
+          ? {
+              code,
+              language: languageManual && language !== "auto" ? language : "auto",
+              theme: effectiveTheme,
+              codeSizePresetId,
+              ogSizePresetId,
+            }
           : {
               ogTitle,
               ogSubtitle,
               brandTemplateId,
               ogAccent,
-              ogTemplateJson,
+              ogTemplateJson: buildOgShareJson(),
+              codeSizePresetId,
+              ogSizePresetId,
             },
     });
     const url = `${window.location.origin}${window.location.pathname}${hash}`;
@@ -229,13 +282,16 @@ export function usePlayground(initial?: { mode?: AppMode; sizePresetId?: string 
   }, [
     mode,
     code,
-    detectedLang,
+    language,
+    languageManual,
     effectiveTheme,
     ogTitle,
     ogSubtitle,
     brandTemplateId,
     ogAccent,
-    ogTemplateJson,
+    buildOgShareJson,
+    codeSizePresetId,
+    ogSizePresetId,
   ]);
 
   const applyBrandTemplate = (id: string) => {
@@ -351,6 +407,8 @@ export function usePlayground(initial?: { mode?: AppMode; sizePresetId?: string 
     setPreviewSvg,
     previewError,
     setPreviewError,
+    ogJsonError,
+    setOgJsonError,
     busy,
     setBusy,
     status,
