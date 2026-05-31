@@ -39,13 +39,20 @@ export async function loadLanguage(lang: string): Promise<void> {
 
 export async function loadCustomTheme(themeJson: string): Promise<string> {
   const parsed = JSON.parse(themeJson) as { name?: string } & Record<string, unknown>;
-  const highlighter = await getHighlighter();
-  if (parsed.name && typeof parsed.name === "string") {
-    await highlighter.loadTheme(parsed as import("shiki").ThemeInput);
-    loadedThemes.add(parsed.name);
+  if (!parsed.name || typeof parsed.name !== "string") {
+    throw new Error("Custom theme JSON must include a 'name' field");
+  }
+
+  const keys = Object.keys(parsed);
+  if (keys.length === 1) {
+    await loadTheme(parsed.name);
     return parsed.name;
   }
-  throw new Error("Custom theme JSON must include a 'name' field");
+
+  const highlighter = await getHighlighter();
+  await highlighter.loadTheme(parsed as import("shiki").ThemeInput);
+  loadedThemes.add(parsed.name);
+  return parsed.name;
 }
 
 export async function loadTheme(theme: string): Promise<void> {
@@ -82,9 +89,12 @@ export async function renderCodeToHtml(opts: CodeRenderOptions): Promise<string>
   await loadLanguage(opts.language);
   await loadTheme(opts.theme);
   const highlighter = await getHighlighter();
-  const themeName = highlighter.getLoadedThemes().includes(opts.theme)
-    ? opts.theme
-    : "github-dark";
+  if (!highlighter.getLoadedThemes().includes(opts.theme)) {
+    throw new Error(
+      `Theme "${opts.theme}" is not loaded. Pick a built-in theme or provide full Shiki theme JSON.`,
+    );
+  }
+  const themeName = opts.theme;
 
   let html = highlighter.codeToHtml(opts.code, {
     lang: opts.language,

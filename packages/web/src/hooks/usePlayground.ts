@@ -176,6 +176,7 @@ export function usePlayground(initial?: { mode?: AppMode; sizePresetId?: string 
       setPreviewError("");
     } catch (e) {
       setPreviewError(e instanceof Error ? e.message : "Invalid template JSON");
+      setPreviewSvg("");
     }
   }, [ogTemplateJson]);
 

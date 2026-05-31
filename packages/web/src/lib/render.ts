@@ -12,7 +12,7 @@ import {
   type ExportFormat,
   type OgRenderOptions,
 } from "@social-render/core";
-import { toBlob } from "html-to-image";
+import { toCanvas } from "html-to-image";
 import { loadOgFonts } from "./fonts";
 
 export async function updateCodePreview(opts: CodeRenderOptions): Promise<string> {
@@ -23,6 +23,47 @@ export async function updateOgPreview(opts: OgRenderOptions): Promise<string> {
   const fonts = await loadOgFonts();
   const label = BRAND_TEMPLATES.find((t) => t.id === opts.templateId)?.label;
   return renderOG(opts, fonts, label);
+}
+
+export function buildOgOptionsFromFields(
+  templateId: string,
+  title: string,
+  subtitle: string,
+  accentColor: string,
+  width: number,
+  height: number,
+  logoDataUrl?: string,
+): OgRenderOptions {
+  return buildOgOptionsFromTemplate(
+    {
+      templateId,
+      variables: { title, subtitle, accentColor },
+    },
+    width,
+    height,
+    logoDataUrl,
+  );
+}
+
+export async function updateOgFromFields(
+  templateId: string,
+  title: string,
+  subtitle: string,
+  accentColor: string,
+  width: number,
+  height: number,
+  logoDataUrl?: string,
+): Promise<string> {
+  const opts = buildOgOptionsFromFields(
+    templateId,
+    title,
+    subtitle,
+    accentColor,
+    width,
+    height,
+    logoDataUrl,
+  );
+  return updateOgPreview(opts);
 }
 
 export async function updateOgFromTemplateJson(
@@ -52,6 +93,39 @@ export async function exportOgPreview(
   return { blob, ext };
 }
 
+async function rasterizeElement(
+  target: HTMLElement,
+  format: ExportFormat,
+  dpi: ExportDpi,
+): Promise<{ blob: Blob; ext: string }> {
+  const canvas = await toCanvas(target, {
+    pixelRatio: dpi,
+    cacheBust: true,
+  });
+
+  const rasterFormat = format === "avif" ? "webp" : format;
+  const mime =
+    rasterFormat === "png"
+      ? "image/png"
+      : rasterFormat === "jpeg"
+        ? "image/jpeg"
+        : rasterFormat === "webp"
+          ? "image/webp"
+          : "image/png";
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Canvas export failed"))),
+      mime,
+      0.92,
+    );
+  });
+
+  let ext = rasterFormat === "jpeg" ? "jpg" : rasterFormat;
+  if (format === "avif") ext = blob.type.includes("avif") ? "avif" : "webp";
+  return { blob, ext };
+}
+
 export async function exportCodeFromHtml(
   html: string,
   format: ExportFormat,
@@ -73,40 +147,25 @@ export async function exportCodeFromHtml(
   await new Promise((r) => setTimeout(r, 200));
 
   const target = doc.getElementById("export-root") ?? doc.body;
-  const pixelRatio = dpi;
 
   if (format === "svg") {
     const w = target.scrollWidth;
     const h = target.scrollHeight;
+    const headStyles = doc.querySelector("style")?.textContent ?? "";
     const serialized = new XMLSerializer().serializeToString(target);
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml">${serialized}</div></foreignObject></svg>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+      <defs><style type="text/css"><![CDATA[${headStyles}]]></style></defs>
+      <foreignObject width="100%" height="100%">
+        <div xmlns="http://www.w3.org/1999/xhtml">${serialized}</div>
+      </foreignObject>
+    </svg>`;
     document.body.removeChild(host);
     return { blob: await svgToBlob(svg), ext: "svg" };
   }
 
-  const mime =
-    format === "png"
-      ? "image/png"
-      : format === "jpeg"
-        ? "image/jpeg"
-        : format === "webp"
-          ? "image/webp"
-          : "image/png";
-
-  const blob = await toBlob(target, {
-    pixelRatio,
-    cacheBust: true,
-    skipFonts: false,
-    type: mime,
-    quality: 0.92,
-  });
-
+  const result = await rasterizeElement(target, format, dpi);
   document.body.removeChild(host);
-  if (!blob) throw new Error("Export failed");
-
-  let ext = format === "jpeg" ? "jpg" : format;
-  if (format === "avif") ext = blob.type.includes("avif") ? "avif" : "webp";
-  return { blob, ext };
+  return result;
 }
 
 export async function downloadExport(

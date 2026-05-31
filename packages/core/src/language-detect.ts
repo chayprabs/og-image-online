@@ -27,16 +27,25 @@ const EXTENSION_MAP: Record<string, string> = {
 };
 
 const PATTERNS: [RegExp, string][] = [
- [/^\s*import .+ from ['"]/m, "typescript"],
- [/^\s*export default function/m, "tsx"],
- [/^\s*def \w+\(/m, "python"],
- [/^\s*fn \w+\(/m, "rust"],
- [/^\s*func \w+\(/m, "go"],
- [/^\s*package main/m, "go"],
- [/^\s*public class /m, "java"],
- [/^\s*#include </m, "cpp"],
- [/^\s*SELECT .+ FROM /im, "sql"],
- [/^\s*<!DOCTYPE html>/im, "html"],
+  [/^\s*@@/m, "diff"],
+  [/^\s*#!/m, "bash"],
+  [/^\s*import .+ from ['"]/m, "typescript"],
+  [/^\s*export\s+default\s+function/m, "tsx"],
+  [/return\s+<[A-Za-z]/m, "jsx"],
+  [/^\s*export\s+function[\s\S]*</m, "jsx"],
+  [/^\s*export\s+(async\s+)?function/m, "typescript"],
+  [/^\s*export\s+(const|let|var|class|interface|type)\s/m, "typescript"],
+  [/^\s*def \w+\(/m, "python"],
+  [/^\s*fn \w+\(/m, "rust"],
+  [/^\s*func \w+\(/m, "go"],
+  [/^\s*package main/m, "go"],
+  [/^\s*public class /m, "java"],
+  [/^\s*#include </m, "cpp"],
+  [/SELECT[\s\S]+FROM/im, "sql"],
+  [/^\s*<!DOCTYPE html>/im, "html"],
+  [/^\s*<[A-Za-z][\w-]*[\s>]/m, "jsx"],
+  [/^\s*\.[a-zA-Z_-][\w-]*\s*\{/m, "css"],
+  [/^\s*--[a-zA-Z]/m, "css"],
 ];
 
 export function detectLanguage(code: string, hint?: string): string {

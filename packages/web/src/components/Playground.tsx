@@ -1,10 +1,8 @@
 import {
   BUILTIN_THEMES,
   BRAND_TEMPLATES,
-  buildOgOptionsFromTemplate,
   CODE_SAMPLES,
   CODE_SIZE_PRESETS,
-  parseOgTemplateJson,
   SIZE_PRESETS,
 } from "@social-render/core";
 import { Clipboard, Download, Link2, Loader2, Sparkles, Trash2 } from "lucide-react";
@@ -16,8 +14,7 @@ import {
   exportCodeFromHtml,
   exportOgPreview,
   updateCodePreview,
-  updateOgFromTemplateJson,
-  updateOgPreview,
+  updateOgFromFields,
 } from "../lib/render";
 
 const LANGUAGES = [
@@ -74,23 +71,15 @@ export default function Playground({
         pg.setPreviewSvg("");
         pg.setPreviewError("");
       } else {
-        let svg: string;
-        try {
-          svg = await updateOgFromTemplateJson(
-            pg.ogTemplateJson,
-            pg.sizePreset.width,
-            pg.sizePreset.height,
-            pg.ogLogoDataUrl,
-          );
-        } catch {
-          const opts = buildOgOptionsFromTemplate(
-            parseOgTemplateJson(pg.ogTemplateJson),
-            pg.sizePreset.width,
-            pg.sizePreset.height,
-            pg.ogLogoDataUrl,
-          );
-          svg = await updateOgPreview(opts);
-        }
+        const svg = await updateOgFromFields(
+          pg.brandTemplateId,
+          pg.ogTitle,
+          pg.ogSubtitle,
+          pg.ogAccent,
+          pg.sizePreset.width,
+          pg.sizePreset.height,
+          pg.ogLogoDataUrl,
+        );
         pg.setPreviewSvg(svg);
         pg.setPreviewHtml("");
         pg.setPreviewError("");
@@ -98,7 +87,8 @@ export default function Playground({
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Preview failed";
       pg.setPreviewError(msg);
-      if (!pg.busy) pg.setPreviewError(msg);
+      pg.setPreviewSvg("");
+      pg.setPreviewHtml("");
     }
   }, [pg]);
 
@@ -136,8 +126,11 @@ export default function Playground({
         const { blob, ext } = await exportCodeFromHtml(html, pg.exportFormat, pg.exportDpi);
         await downloadExport(blob, pg.exportFormat, pg.exportDpi, ext);
       } else {
-        const svg = await updateOgFromTemplateJson(
-          pg.ogTemplateJson,
+        const svg = await updateOgFromFields(
+          pg.brandTemplateId,
+          pg.ogTitle,
+          pg.ogSubtitle,
+          pg.ogAccent,
           pg.sizePreset.width,
           pg.sizePreset.height,
           pg.ogLogoDataUrl,
@@ -165,16 +158,45 @@ export default function Playground({
     pg.setBusy(true);
     try {
       if (pg.mode === "code") {
-        const { blob } = await exportCodeFromHtml(pg.previewHtml, "png", 1);
+        const html =
+          pg.previewHtml ||
+          (await updateCodePreview({
+            code: pg.code,
+            language: pg.detectedLang,
+            theme: pg.effectiveTheme,
+            windowChrome: pg.windowChrome,
+            showLineNumbers: pg.showLineNumbers,
+            lineHighlights: pg.parsedLineHighlights,
+            diffHighlights: pg.diffHighlights,
+            padding: pg.padding,
+            shadow: pg.shadow,
+            gradient: pg.gradient,
+            fontFamily: pg.fontFamily,
+            fontSize: pg.fontSize,
+            ligatures: pg.ligatures,
+            customFontCss: pg.customFontCss,
+            width: pg.sizePreset.width,
+            height: pg.sizePreset.height,
+          }));
+        const { blob } = await exportCodeFromHtml(html, "png", 1);
         await copyBlobToClipboard(blob);
       } else {
-        const svg = await updateOgFromTemplateJson(
-          pg.ogTemplateJson,
+        const svg = await updateOgFromFields(
+          pg.brandTemplateId,
+          pg.ogTitle,
+          pg.ogSubtitle,
+          pg.ogAccent,
           pg.sizePreset.width,
           pg.sizePreset.height,
           pg.ogLogoDataUrl,
         );
-        const { blob } = await exportOgPreview(svg, pg.sizePreset.width, pg.sizePreset.height, "png", 1);
+        const { blob } = await exportOgPreview(
+          svg,
+          pg.sizePreset.width,
+          pg.sizePreset.height,
+          "png",
+          1,
+        );
         await copyBlobToClipboard(blob);
       }
       pg.setStatus("Copied image to clipboard");
