@@ -37,6 +37,17 @@ export async function loadLanguage(lang: string): Promise<void> {
   }
 }
 
+export async function loadCustomTheme(themeJson: string): Promise<string> {
+  const parsed = JSON.parse(themeJson) as { name?: string } & Record<string, unknown>;
+  const highlighter = await getHighlighter();
+  if (parsed.name && typeof parsed.name === "string") {
+    await highlighter.loadTheme(parsed as import("shiki").ThemeInput);
+    loadedThemes.add(parsed.name);
+    return parsed.name;
+  }
+  throw new Error("Custom theme JSON must include a 'name' field");
+}
+
 export async function loadTheme(theme: string): Promise<void> {
   if (!theme || theme === "custom") return;
   if (loadedThemes.has(theme)) return;
@@ -96,8 +107,11 @@ export async function renderCodeToHtml(opts: CodeRenderOptions): Promise<string>
   const highlights = new Set(opts.lineHighlights);
   const diffMap = new Map(opts.diffHighlights.map((d) => [d.line, d.type]));
 
+  const fontFace = opts.customFontCss ? `${opts.customFontCss}\n` : "";
+
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/><style>
+  ${fontFace}
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { ${bg} padding: ${opts.padding}px; font-family: ${opts.fontFamily}, monospace; font-size: ${opts.fontSize}px; font-variant-ligatures: ${fontVariant}; }
   .frame { border-radius: 12px; overflow: hidden; ${shadow} max-width: ${opts.width}px; }

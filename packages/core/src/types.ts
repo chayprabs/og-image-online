@@ -32,6 +32,7 @@ export interface CodeRenderOptions {
   ligatures: boolean;
   width: number;
   height: number;
+  customFontCss?: string;
 }
 
 export interface OgRenderOptions {
@@ -41,6 +42,7 @@ export interface OgRenderOptions {
   width: number;
   height: number;
   templateId: string;
+  logoDataUrl?: string;
 }
 
 export interface ExportOptions {

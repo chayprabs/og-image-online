@@ -1,18 +1,22 @@
 import {
   BUILTIN_THEMES,
   BRAND_TEMPLATES,
+  buildOgOptionsFromTemplate,
   CODE_SAMPLES,
   CODE_SIZE_PRESETS,
+  parseOgTemplateJson,
   SIZE_PRESETS,
 } from "@social-render/core";
-import { Download, Link2, Loader2, Sparkles } from "lucide-react";
+import { Clipboard, Download, Link2, Loader2, Sparkles, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import { usePlayground } from "../hooks/usePlayground";
 import {
+  copyBlobToClipboard,
   downloadExport,
   exportCodeFromHtml,
   exportOgPreview,
   updateCodePreview,
+  updateOgFromTemplateJson,
   updateOgPreview,
 } from "../lib/render";
 
@@ -55,13 +59,14 @@ export default function Playground({
           windowChrome: pg.windowChrome,
           showLineNumbers: pg.showLineNumbers,
           lineHighlights: pg.parsedLineHighlights,
-          diffHighlights: [],
+          diffHighlights: pg.diffHighlights,
           padding: pg.padding,
           shadow: pg.shadow,
           gradient: pg.gradient,
           fontFamily: pg.fontFamily,
           fontSize: pg.fontSize,
           ligatures: pg.ligatures,
+          customFontCss: pg.customFontCss,
           width: pg.sizePreset.width,
           height: pg.sizePreset.height,
         });
@@ -69,14 +74,23 @@ export default function Playground({
         pg.setPreviewSvg("");
         pg.setPreviewError("");
       } else {
-        const svg = await updateOgPreview({
-          title: pg.ogTitle,
-          subtitle: pg.ogSubtitle,
-          accentColor: pg.ogAccent,
-          templateId: pg.brandTemplateId,
-          width: pg.sizePreset.width,
-          height: pg.sizePreset.height,
-        });
+        let svg: string;
+        try {
+          svg = await updateOgFromTemplateJson(
+            pg.ogTemplateJson,
+            pg.sizePreset.width,
+            pg.sizePreset.height,
+            pg.ogLogoDataUrl,
+          );
+        } catch {
+          const opts = buildOgOptionsFromTemplate(
+            parseOgTemplateJson(pg.ogTemplateJson),
+            pg.sizePreset.width,
+            pg.sizePreset.height,
+            pg.ogLogoDataUrl,
+          );
+          svg = await updateOgPreview(opts);
+        }
         pg.setPreviewSvg(svg);
         pg.setPreviewHtml("");
         pg.setPreviewError("");
@@ -99,15 +113,37 @@ export default function Playground({
     pg.setStatus("");
     try {
       if (pg.mode === "code") {
-        const { blob, ext } = await exportCodeFromHtml(
-          pg.previewHtml,
-          pg.exportFormat,
-          pg.exportDpi,
-        );
+        const html =
+          pg.previewHtml ||
+          (await updateCodePreview({
+            code: pg.code,
+            language: pg.detectedLang,
+            theme: pg.effectiveTheme,
+            windowChrome: pg.windowChrome,
+            showLineNumbers: pg.showLineNumbers,
+            lineHighlights: pg.parsedLineHighlights,
+            diffHighlights: pg.diffHighlights,
+            padding: pg.padding,
+            shadow: pg.shadow,
+            gradient: pg.gradient,
+            fontFamily: pg.fontFamily,
+            fontSize: pg.fontSize,
+            ligatures: pg.ligatures,
+            customFontCss: pg.customFontCss,
+            width: pg.sizePreset.width,
+            height: pg.sizePreset.height,
+          }));
+        const { blob, ext } = await exportCodeFromHtml(html, pg.exportFormat, pg.exportDpi);
         await downloadExport(blob, pg.exportFormat, pg.exportDpi, ext);
       } else {
+        const svg = await updateOgFromTemplateJson(
+          pg.ogTemplateJson,
+          pg.sizePreset.width,
+          pg.sizePreset.height,
+          pg.ogLogoDataUrl,
+        );
         const { blob, ext } = await exportOgPreview(
-          pg.previewSvg,
+          svg,
           pg.sizePreset.width,
           pg.sizePreset.height,
           pg.exportFormat,
@@ -124,6 +160,30 @@ export default function Playground({
   };
 
   const sizePresets = pg.mode === "code" ? CODE_SIZE_PRESETS : SIZE_PRESETS;
+
+  const handleCopy = async () => {
+    pg.setBusy(true);
+    try {
+      if (pg.mode === "code") {
+        const { blob } = await exportCodeFromHtml(pg.previewHtml, "png", 1);
+        await copyBlobToClipboard(blob);
+      } else {
+        const svg = await updateOgFromTemplateJson(
+          pg.ogTemplateJson,
+          pg.sizePreset.width,
+          pg.sizePreset.height,
+          pg.ogLogoDataUrl,
+        );
+        const { blob } = await exportOgPreview(svg, pg.sizePreset.width, pg.sizePreset.height, "png", 1);
+        await copyBlobToClipboard(blob);
+      }
+      pg.setStatus("Copied image to clipboard");
+    } catch (e) {
+      pg.setStatus(e instanceof Error ? e.message : "Copy failed");
+    } finally {
+      pg.setBusy(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -267,6 +327,26 @@ export default function Playground({
                     />
                     Ligatures
                   </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={pg.enableDiffHighlights}
+                      onChange={(e) => pg.setEnableDiffHighlights(e.target.checked)}
+                    />
+                    Diff highlights
+                  </label>
+                  <label className="text-sm sm:col-span-2">
+                    Upload font (.ttf, .otf, .woff)
+                    <input
+                      type="file"
+                      accept=".ttf,.otf,.woff,.woff2"
+                      className="mt-1 block w-full text-xs"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) pg.handleFontUpload(f);
+                      }}
+                    />
+                  </label>
                   <label className="text-sm">
                     Line highlights (1,3,5)
                     <input
@@ -356,6 +436,46 @@ export default function Playground({
                   className="mt-1 h-10 w-full cursor-pointer rounded-lg border border-gray-200"
                 />
               </label>
+              <label className="block text-sm font-medium text-gray-700">
+                Logo upload
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="mt-1 block w-full text-xs"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) pg.handleLogoUpload(f);
+                  }}
+                />
+              </label>
+              <details className="rounded-lg border border-gray-200 bg-white p-3 text-sm" open>
+                <summary className="cursor-pointer font-medium text-gray-700">
+                  Template JSON editor
+                </summary>
+                <textarea
+                  value={pg.ogTemplateJson}
+                  onChange={(e) => pg.setOgTemplateJson(e.target.value)}
+                  rows={8}
+                  className="mt-2 w-full resize-y rounded border border-gray-200 p-2 font-mono text-xs"
+                  spellCheck={false}
+                />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={pg.applyOgTemplateJson}
+                    className="rounded bg-gray-900 px-3 py-1 text-xs text-white"
+                  >
+                    Apply JSON
+                  </button>
+                  <button
+                    type="button"
+                    onClick={pg.syncOgTemplateFromVars}
+                    className="rounded bg-gray-100 px-3 py-1 text-xs text-gray-700"
+                  >
+                    Sync from fields
+                  </button>
+                </div>
+              </details>
               <div>
                 <span className="text-sm font-medium text-gray-700">Brand templates</span>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -436,6 +556,23 @@ export default function Playground({
             >
               <Link2 size={16} />
               Share
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleCopy()}
+              disabled={pg.busy}
+              className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+            >
+              <Clipboard size={16} />
+              Copy
+            </button>
+            <button
+              type="button"
+              onClick={pg.clearLocalData}
+              title="Clear saved preferences"
+              className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm text-gray-500 ring-1 ring-gray-200 hover:bg-gray-50"
+            >
+              <Trash2 size={16} />
             </button>
           </div>
 

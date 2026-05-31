@@ -114,6 +114,7 @@ pnpm install && pnpm build && pnpm preview`,
   },
 ];
 
+/** Re-export for backward compatibility — prefer OG_TEMPLATE_SPECS from og-templates.ts */
 export const BRAND_TEMPLATES: BrandTemplate[] = [
   {
     id: "blog-header",

@@ -1,0 +1,20 @@
+{
+  "name": "@social-render/cli",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "social-render": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "echo 'cli lint ok'"
+  },
+  "dependencies": {
+    "@social-render/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2"
+  }
+}

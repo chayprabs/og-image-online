@@ -1,0 +1,4 @@
+Contact: https://github.com/chayprabs/og-image-online/security/advisories/new
+Expires: 2027-05-31T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://github.com/chayprabs/og-image-online/blob/main/SECURITY.txt

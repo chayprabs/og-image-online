@@ -1,16 +1,20 @@
 # SocialRender (`og-image-online`)
 
-Generate **Open Graph social cards** and **syntax-highlighted code screenshots** online — themes, fonts, line highlights, and brand templates. Everything runs in your browser; your code never leaves your device.
+Generate **Open Graph social cards** and **syntax-highlighted code screenshots** in your browser. Themes, window chrome, line highlights, brand templates, JSON template editor, font/logo upload, and exact-DPI export — your code never leaves your device.
 
 ![SocialRender preview](docs/screenshot.svg)
 
 ## Features
 
-- **Code Image** — Shiki-powered highlighting for 150+ languages (lazy-loaded per language), window chrome (macOS / Windows / none), shadows, gradients, line highlights, and custom themes.
-- **OG Image** — Live social card preview with title, subtitle, accent color, and brand templates.
-- **Export** — SVG, PNG, JPEG, WebP, and AVIF at 1×, 2×, and 3× DPI with size presets (Open Graph, Twitter, LinkedIn, HD, and more).
-- **Share** — Encode template state in the URL hash.
-- **Privacy-first** — Browser-only processing after initial load.
+| Area | Capabilities |
+|------|----------------|
+| **Code Image** | Shiki highlighting (150+ languages, lazy-loaded), auto-detect language, 10+ themes + custom JSON theme, macOS/Windows/none chrome, shadows, gradients, line numbers, line & diff highlights, font upload, ligatures |
+| **OG Image** | Live Satori preview, title/subtitle/accent variables, logo upload, brand templates, JSON template editor with Apply/Sync |
+| **Export** | SVG, PNG, JPEG, WebP, AVIF at 1×/2×/3× DPI |
+| **Presets** | Open Graph 1200×630, square, HD, Twitter, LinkedIn |
+| **Share** | URL hash encodes full state |
+| **Privacy** | Browser-only after load; optional local preferences (clear anytime) |
+| **PWA** | Installable progressive web app |
 
 ## Quick start
 
@@ -32,20 +36,30 @@ pnpm build
 pnpm --filter @social-render/web preview
 ```
 
-Serve `packages/web/dist` on any static host (Cloudflare Pages, Netlify, nginx, etc.).
+Serve `packages/web/dist` on Cloudflare Pages, Netlify, nginx, etc.
 
-### Docker (static preview)
+### Docker
 
 ```bash
 docker compose up --build
+```
+
+Serves the static build at [http://localhost:8080](http://localhost:8080).
+
+### CLI
+
+```bash
+pnpm --filter @social-render/cli build
+node packages/cli/dist/cli.js -f example.ts -o out.html -l typescript
 ```
 
 ## Project structure
 
 ```
 packages/
-  core/   # Shiki + Satori rendering, export helpers, samples
-  web/    # Vite + React playground
+  core/   # Shiki + Satori rendering, export, templates, diff parser
+  web/    # Vite + React playground (PWA)
+  cli/    # Optional HTML export from terminal
 ```
 
 ## SEO landing pages
@@ -59,15 +73,25 @@ packages/
 ## Library API
 
 ```ts
-import { renderCode, renderOG } from "@social-render/core";
-
-const html = await renderCode({ /* CodeRenderOptions */ });
-const svg = await renderOG({ /* OgRenderOptions */ });
+import {
+  renderCodeToHtml,
+  renderOG,
+  parseDiffHighlights,
+  buildOgOptionsFromTemplate,
+} from "@social-render/core";
 ```
+
+## Topics
+
+`og-image` · `open-graph` · `social-card` · `code-screenshot` · `shiki` · `carbon` · `code-image` · `social-media` · `twitter-card` · `linkedin-preview` · `brand-templates` · `marketing-images` · `syntax-highlighting` · `online-tool` · `og-image-generator`
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Security
+
+Report vulnerabilities via [GitHub Security Advisories](https://github.com/chayprabs/og-image-online/security/advisories/new). See [SECURITY.md](SECURITY.md) and [SECURITY.txt](SECURITY.txt).
 
 ## Contributing
 

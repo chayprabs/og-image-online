@@ -9,7 +9,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "pnpm -r build",
+    "build": "pnpm --filter @social-render/core build && pnpm --filter @social-render/web build && pnpm --filter @social-render/cli build",
     "dev": "pnpm --filter @social-render/web dev",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm --filter @social-render/core build && pnpm -r typecheck",

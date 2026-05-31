@@ -12,10 +12,7 @@ export type SatoriFont = {
 
 type SatoriNode = {
   type: string;
-  props: {
-    style?: Record<string, string | number>;
-    children?: string | SatoriNode | SatoriNode[];
-  };
+  props: Record<string, unknown>;
 };
 
 function buildOgElement(opts: OgRenderOptions, label: string): SatoriNode {
@@ -49,6 +46,19 @@ function buildOgElement(opts: OgRenderOptions, label: string): SatoriNode {
         fontFamily: OG_FONT_FAMILY,
       },
       children: [
+        ...(opts.logoDataUrl
+          ? [
+              {
+                type: "img",
+                props: {
+                  src: opts.logoDataUrl,
+                  width: 72,
+                  height: 72,
+                  style: { marginBottom: 24, borderRadius: 12, objectFit: "cover" as const },
+                },
+              },
+            ]
+          : []),
         {
           type: "div",
           props: {

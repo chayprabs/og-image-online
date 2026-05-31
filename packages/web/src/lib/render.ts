@@ -1,7 +1,9 @@
 import {
   BRAND_TEMPLATES,
+  buildOgOptionsFromTemplate,
   downloadBlob,
   exportRaster,
+  parseOgTemplateJson,
   renderCodeToHtml,
   renderOG,
   svgToBlob,
@@ -23,6 +25,17 @@ export async function updateOgPreview(opts: OgRenderOptions): Promise<string> {
   return renderOG(opts, fonts, label);
 }
 
+export async function updateOgFromTemplateJson(
+  templateJson: string,
+  width: number,
+  height: number,
+  logoDataUrl?: string,
+): Promise<string> {
+  const parsed = parseOgTemplateJson(templateJson);
+  const opts = buildOgOptionsFromTemplate(parsed, width, height, logoDataUrl);
+  return updateOgPreview(opts);
+}
+
 export async function exportOgPreview(
   svg: string,
   width: number,
@@ -34,7 +47,8 @@ export async function exportOgPreview(
     return { blob: await svgToBlob(svg), ext: "svg" };
   }
   const blob = await exportRaster(svg, width, height, format, dpi);
-  const ext = format === "jpeg" ? "jpg" : format;
+  let ext = format === "jpeg" ? "jpg" : format;
+  if (format === "avif" && blob.type.includes("webp")) ext = "webp";
   return { blob, ext };
 }
 
@@ -61,7 +75,6 @@ export async function exportCodeFromHtml(
   const target = doc.getElementById("export-root") ?? doc.body;
   const pixelRatio = dpi;
 
-  let blob: Blob | null;
   if (format === "svg") {
     const w = target.scrollWidth;
     const h = target.scrollHeight;
@@ -80,7 +93,7 @@ export async function exportCodeFromHtml(
           ? "image/webp"
           : "image/png";
 
-  blob = await toBlob(target, {
+  const blob = await toBlob(target, {
     pixelRatio,
     cacheBust: true,
     skipFonts: false,
@@ -92,10 +105,7 @@ export async function exportCodeFromHtml(
   if (!blob) throw new Error("Export failed");
 
   let ext = format === "jpeg" ? "jpg" : format;
-  if (format === "avif") {
-    ext = blob.type.includes("avif") ? "avif" : "webp";
-  }
-
+  if (format === "avif") ext = blob.type.includes("avif") ? "avif" : "webp";
   return { blob, ext };
 }
 
@@ -107,4 +117,9 @@ export async function downloadExport(
 ): Promise<void> {
   const suffix = format === "svg" ? "" : `@${dpi}x`;
   downloadBlob(blob, `social-render${suffix}.${ext}`);
+}
+
+export async function copyBlobToClipboard(blob: Blob): Promise<void> {
+  if (!navigator.clipboard?.write) throw new Error("Clipboard API unavailable");
+  await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
 }
