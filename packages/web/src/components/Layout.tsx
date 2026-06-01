@@ -38,7 +38,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               className="rounded-md p-2 text-gray-600 transition hover:bg-gray-100 hover:text-gray-900"
               title="GitHub repository"
             >
-              <Github size={20} />
+              <GitHubIcon />
               <span className="sr-only">GitHub</span>
             </a>
             <a
